@@ -4,6 +4,12 @@ const db = SQLite.openDatabaseSync('clienttracker.db');
 
 // ─── TYPES ─────────────────────────────────────────────
 
+function localISO(): string {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime()-offset).toISOString().slice(0,19);
+}
+
 export interface Client {
   id: number;
   name: string;
@@ -19,6 +25,7 @@ export interface BaselineStat {
   weight: number | null;
   height: number | null;
   body_fat: number | null;
+  muscle: number | null;
   recorded_at: string;
 }
 
@@ -26,6 +33,14 @@ export interface Lift {
   id: number;
   name: string;
 }
+
+export interface WorkoutSession {
+  id: number;
+  client_id: number;
+  notes: string | null;
+  performed_at: string;
+}
+
 
 export interface LiftEntry {
   id: number;
@@ -36,6 +51,15 @@ export interface LiftEntry {
   sets: number | null;
   recorded_at: string;
   lift_name: string;
+}
+
+export function resetDB(): void {
+  db.execSync(`DROP TABLE IF EXISTS lift_entries;`);
+  db.execSync(`DROP TABLE IF EXISTS workout_sessions;`);
+  db.execSync(`DROP TABLE IF EXISTS baseline_stats;`);
+  db.execSync(`DROP TABLE IF EXISTS lifts;`);
+  db.execSync(`DROP TABLE IF EXISTS clients;`);
+  initDB();
 }
 
 // ─── INIT ──────────────────────────────────────────────
@@ -49,7 +73,9 @@ export function initDB(): void {
       age INTEGER,
       height TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
+      );
+    `);
+    db.execSync(`
     CREATE TABLE IF NOT EXISTS baseline_stats (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       client_id INTEGER,
@@ -59,30 +85,38 @@ export function initDB(): void {
       body_fat REAL,
       recorded_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (client_id) REFERENCES clients(id)
-    );
+      );
+    `);
+    db.execSync(`
     CREATE TABLE IF NOT EXISTS workout_sessions(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       client_id INTEGER,
       notes TEXT,
-      performed_at TEXT DEFAULT CURRENT_TIMESTRAMP,
+      performed_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (client_id) REFERENCES clients(id)
-    );
+      );
+    `);
+    db.execSync(`
     CREATE TABLE IF NOT EXISTS lifts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL
-    );
+      );
+    `);
+    db.execSync(`
     CREATE TABLE IF NOT EXISTS lift_entries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       client_id INTEGER,
       lift_id INTEGER,
+      session_id INTEGER,
       weight REAL,
       reps INTEGER,
       sets INTEGER,
       recorded_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (client_id) REFERENCES clients(id),
-      FOREIGN KEY (lift_id) REFERENCES lifts(id)
-    );
-  `);
+      FOREIGN KEY (lift_id) REFERENCES lifts(id),
+      FOREIGN KEY (session_id) REFERENCES workout_sessions(id)
+      );
+    `);
 }
 
 // ─── CLIENTS ───────────────────────────────────────────
@@ -101,13 +135,43 @@ export function getClients(): Client[] {
 // export function deleteClient(id: number): void {
 //   db.runSync(`DELETE FROM clients WHERE id = ?`, [id]);
 // }
-db.execSync('BEGIN TRANSACTION');
-  export function removeClient(id: number): void {
-    db.runSync(`DELETE FROM lift_entries WHERE client_id = ?`, [id]);
-    db.runSync(`DELETE FROM baseline_stats WHERE client_id = ?`, [id]);
-    db.runSync(`DELETE FROM clients WHERE id = ?`, [id]);
+
+export function removeClient(id: number): void {
+  db.execSync('BEGIN TRANSACTION');
+  db.runSync(`DELETE FROM lift_entries WHERE client_id = ?`, [id]);
+  db.runSync('DELETE FROM workout_sessions WHERE client_id = ?', [id])
+  db.runSync(`DELETE FROM baseline_stats WHERE client_id = ?`, [id]);
+  db.runSync(`DELETE FROM clients WHERE id = ?`, [id]);
+  db.execSync('COMMIT');
+}
+
+// ─── WORKOUTS ────────────────────────────────────
+
+export function getWorkoutSessions(client_id: number): WorkoutSession[] {
+  return db.getAllSync<WorkoutSession>(
+    `SELECT * FROM workout_sessions WHERE client_id = ? ORDER BY performed_at DESC`,
+    [client_id]
+  );
+}
+
+export function deleteWorkoutSession(id: number): void {
+  db.runSync(`DELETE FROM lift_entries WHERE session_id = ?`, [id]);
+  db.runSync(`DELETE FROM workout_sessions WHERE id = ?`, [id]);
+}
+
+export function addWorkoutSession(client_id: number, notes: string, date?: string): SQLite.SQLiteRunResult {
+  let performed_at: string;
+  if (date) {
+    performed_at = `${date}T12:00:00`;
+  } else {
+    performed_at = localISO();
   }
-db.execSync('COMMIT');
+  return db.runSync(
+    `INSERT INTO workout_sessions (client_id, notes, performed_at) VALUES (?, ?, ?)`,
+    [client_id, notes || null, performed_at]
+  );
+}
+
 
 // ─── BASELINE STATS ────────────────────────────────────
 

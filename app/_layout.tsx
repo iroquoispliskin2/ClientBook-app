@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import { useEffect } from "react";
-import { initDB } from "../database";
+import { initDB, resetDB } from "../database";
+
 
 export default function RootLayout() {
   useEffect(() => {
@@ -18,7 +19,7 @@ export default function RootLayout() {
         headerTintColor: "black",
         
         headerStyle: {
-          backgroundColor: "#B6E3BE",
+          backgroundColor: "grey",
           
         }
       }}

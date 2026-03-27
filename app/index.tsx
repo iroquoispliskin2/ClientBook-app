@@ -100,7 +100,7 @@ export default function Index() {
 const styles = StyleSheet.create({
   name: {
     fontSize: 28,
-    // fontWeight: "bold",
+    fontWeight: "bold",
     textAlign: "left",
     color: "black"
   },

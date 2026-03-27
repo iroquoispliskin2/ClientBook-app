@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
       marginTop: 3,
     },
     navButton: {
-      backgroundColor: "#B6E3BE",
+      backgroundColor: "grey",
       padding: 33,
       borderRadius: 16,
       marginTop: 8,
