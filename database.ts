@@ -226,16 +226,28 @@ export function addSessionEntry(
 
 // ─── BASELINE STATS ────────────────────────────────────
 
-export function addBaselineStat(client_id: number, weight: number, height: number, body_fat: number): SQLite.SQLiteRunResult {
+export function addBaselineStat(
+  client_id: number,
+  weight: number | null,
+  muscle: number | null,
+  body_fat: number | null,
+  date?: string
+): SQLite.SQLiteRunResult {
+  let recorded_at: string;
+  if (date) {
+    recorded_at = `${date}T12:00:00`;
+  } else {
+    recorded_at = localISO();
+  }
   return db.runSync(
-    `INSERT INTO baseline_stats (client_id, weight, height, body_fat) VALUES (?, ?, ?, ?)`,
-    [client_id, weight, height, body_fat]
+    `INSERT INTO baseline_stats (client_id, weight, muscle, body_fat, recorded_at) VALUES (?, ?, ?, ?, ?)`,
+    [client_id, weight, muscle, body_fat, recorded_at]
   );
 }
 
 export function getBaselineStats(client_id: number): BaselineStat[] {
   return db.getAllSync<BaselineStat>(
-    `SELECT * FROM baseline_stats WHERE client_id = ?`,
+    `SELECT * FROM baseline_stats WHERE client_id = ? ORDER BY recorded_at DESC`,
     [client_id]
   );
 }
