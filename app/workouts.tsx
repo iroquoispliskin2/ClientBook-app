@@ -47,7 +47,7 @@ return (
                 <TouchableOpacity 
                     key={session.id}
                     style={styles.sessionButton}
-                    onPress={()=>router.push({ pathname: "/sessiondetail", params: {sessionID:session.id } })}
+                    onPress={()=>router.push({ pathname: "/sessiondetail", params: {sessionID:session.id, name: name } })}
                 >
                     <Text style={styles.dateText}>{formatDate(session.performed_at)}</Text>
                     {session.notes ? <Text style={styles.notesText}>{session.notes}</Text>:null}

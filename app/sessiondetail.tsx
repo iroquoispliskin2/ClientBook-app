@@ -1,15 +1,15 @@
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, Button, Alert } from "react-native";
-import { getSessionEntries, addSessionEntry, deleteSessionEntry, getLifts, getClients, SessionLiftEntry, Lift } from "@/database";
+import { getSessionEntries, addSessionEntry, deleteSessionEntry, getLifts, getClients, SessionLiftEntry, Lift, Client } from "@/database";
 
 export default function SessionDetail() {
-    const {sessionID, name} = useLocalSearchParams();
+    const { sessionID, name } = useLocalSearchParams();
     const [entries, setEntries] = useState<SessionLiftEntry[]>([]);
     const [lifts, setLifts] = useState<Lift[]>([]);
     const [expanded, setExpanded] = useState<Record<number, boolean>>({});
     const [modalVisible, setModalVisible] = useState(false);
-    const [clientId, setClientId] = useState<number | null>(null);
+    const [client, setClient] = useState<Client | null>(null);
 
     const [selectedLift, setSelectedLift] = useState<Lift | null>(null);
     const [liftPickerVisible, setLiftPickerVisible] = useState(false);
@@ -21,28 +21,32 @@ export default function SessionDetail() {
 
     useEffect(() => {
         const clients = getClients();
-        const found = clients.find((c)=> c.name === String(name));
-        if (found) setClientId(found.id);
+        const found = clients.find((c) => c.name === String(name));
+        setClient(found || null);
         setEntries(getSessionEntries(sid));
         const allLifts = getLifts();
-        setLifts(allLifts.sort((a,b)=>a.name.localeCompare(b.name)));
+        setLifts(allLifts.sort((a, b) => a.name.localeCompare(b.name)));
     }, []);
 
     function toggleExpand(lift_id: number) {
-        setExpanded((prev) => ({...prev, [lift_id]: !prev[lift_id]}));
+        setExpanded((prev) => ({ ...prev, [lift_id]: !prev[lift_id] }));
     }
 
     function handleAdd() {
-        if (!selectedLift || clientId === null) return;
-        addSessionEntry(
-            sid, 
-            clientId,
-            selectedLift.id,
-            weight ? Number(weight) : null,
-            reps ? Number(reps) : null,
-            rpe ? Number(rpe) : null, 
-        );
-        setEntries(getSessionEntries(sid));
+        if (!selectedLift || !client) return;
+        try {
+            addSessionEntry(
+                sid,
+                client.id,
+                selectedLift.id,
+                weight ? Number(weight) : null,
+                reps ? Number(reps) : null,
+                rpe ? Number(rpe) : null,
+            );
+            setEntries(getSessionEntries(sid));
+        } catch (e) {
+            console.log('insert failed:', e);
+        }
         setModalVisible(false);
         setSelectedLift(null);
         setWeight('');
@@ -52,7 +56,7 @@ export default function SessionDetail() {
 
     function handleDelete(id: number) {
         Alert.alert("Delete Set", "Remove this set?", [
-            { text: "Cancel", style: "cancel"},
+            { text: "Cancel", style: "cancel" },
             {
                 text: "Delete", style: "destructive", onPress: () => {
                     deleteSessionEntry(id);
@@ -69,8 +73,8 @@ export default function SessionDetail() {
     }, {});
 
     return (
-        <View style={{flex: 1}}>
-            <ScrollView contentContainerStyle= {{ gap: 12, padding: 16}}>
+        <View style={{ flex: 1 }}>
+            <ScrollView contentContainerStyle={{ gap: 12, padding: 16 }}>
                 {Object.keys(grouped).length === 0 && (
                     <Text style={styles.empty}>No exercises logged yet.</Text>
                 )}
@@ -90,50 +94,53 @@ export default function SessionDetail() {
                                         <Text style={styles.setLabel}>Set {index + 1}</Text>
                                         <Text style={styles.setText}>{set.weight ?? '-'} lbs</Text>
                                         <Text style={styles.setText}>{set.reps ?? '-'} reps</Text>
-                                        <Text style={styles.setText}> RPE {set.rpe ?? '-'}</Text>
+                                        <Text style={styles.setText}>RPE {set.rpe ?? '-'}</Text>
                                     </View>
                                 </TouchableOpacity>
                             ))}
-
                         </View>
                     );
                 })}
             </ScrollView>
 
-            <TouchableOpacity style={styles.fab} onPress={()=>setModalVisible(true)}>
+            <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
                 <Text style={styles.fabIcon}>+</Text>
             </TouchableOpacity>
 
+            {/* Log Set Modal */}
             <Modal visible={modalVisible} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
-                        <Text style = {styles.modalTitle}>Log a set</Text>
-                        <TouchableOpacity style={styles.input} onPress = {()=> setLiftPickerVisible(true)}>
-                            <Text style={{ fontSize: 16, color: selectedLift ? 'black' : '#aaa'}}>
+                        <Text style={styles.modalTitle}>Log a Set</Text>
+                        <TouchableOpacity style={styles.input} onPress={() => setLiftPickerVisible(true)}>
+                            <Text style={{ fontSize: 16, color: selectedLift ? 'black' : '#aaa' }}>
                                 {selectedLift ? selectedLift.name : 'Select Movement'}
                             </Text>
                         </TouchableOpacity>
-
                         <TextInput style={styles.input} placeholder="Weight (lbs)" keyboardType="numeric" value={weight} onChangeText={setWeight} />
                         <TextInput style={styles.input} placeholder="Reps" keyboardType="numeric" value={reps} onChangeText={setReps} />
                         <TextInput style={styles.input} placeholder="RPE (1-10)" keyboardType="numeric" value={rpe} onChangeText={setRpe} />
-
                         <Button title="Add Set" onPress={handleAdd} />
                         <Button title="Cancel" color="red" onPress={() => setModalVisible(false)} />
                     </View>
                 </View>
             </Modal>
 
+            {/* Lift Picker Modal */}
             <Modal visible={liftPickerVisible} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>Select Movement</Text>
                         <ScrollView style={{ maxHeight: 300 }}>
                             {lifts.map((lift) => (
-                                <TouchableOpacity key={lift.id} style ={styles.liftOption} onPress={() => {
-                                setSelectedLift(lift);
-                                setLiftPickerVisible(false);
-                                }}>
+                                <TouchableOpacity
+                                    key={lift.id}
+                                    style={styles.liftOption}
+                                    onPress={() => {
+                                        setSelectedLift(lift);
+                                        setLiftPickerVisible(false);
+                                    }}
+                                >
                                     <Text style={styles.liftOptionText}>{lift.name}</Text>
                                 </TouchableOpacity>
                             ))}
@@ -143,7 +150,7 @@ export default function SessionDetail() {
                 </View>
             </Modal>
         </View>
-    )
+    );
 }
 
 const styles = StyleSheet.create({
@@ -169,23 +176,23 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         borderTopWidth: 1,
         borderTopColor: '#444',
-      },
-      setLabel: {
+    },
+    setLabel: {
         color: '#aaa',
         fontSize: 14,
         width: 50,
-      },
-      setText: {
+    },
+    setText: {
         color: 'white',
         fontSize: 14,
-      },
-      empty: {
+    },
+    empty: {
         textAlign: 'center',
         color: 'gray',
         marginTop: 40,
         fontSize: 16,
-      },
-      fab: {
+    },
+    fab: {
         position: 'absolute',
         bottom: 30,
         right: 30,
@@ -200,43 +207,43 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.3,
         shadowRadius: 4,
-      },
-      fabIcon: {
+    },
+    fabIcon: {
         color: 'white',
         fontSize: 32,
         lineHeight: 34,
-      },
-      modalOverlay: {
+    },
+    modalOverlay: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: 'rgba(0,0,0,0.5)',
-      },
-      modalContent: {
+    },
+    modalContent: {
         backgroundColor: 'white',
         borderRadius: 20,
         padding: 24,
         width: '85%',
         gap: 12,
-      },
-      modalTitle: {
+    },
+    modalTitle: {
         fontSize: 22,
         fontWeight: 'bold',
         marginBottom: 8,
-      },
-      input: {
+    },
+    input: {
         borderWidth: 1,
         borderColor: '#ccc',
         borderRadius: 10,
         padding: 10,
         fontSize: 16,
-      },
-      liftOption: {
+    },
+    liftOption: {
         padding: 14,
         borderBottomWidth: 1,
         borderBottomColor: '#eee',
-      },
-      liftOptionText: {
+    },
+    liftOptionText: {
         fontSize: 16,
-      },
+    },
 });

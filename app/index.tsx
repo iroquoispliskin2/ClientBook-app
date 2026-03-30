@@ -1,22 +1,34 @@
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { ScrollView, Text, View, StyleSheet, TouchableOpacity, Modal, TextInput, Button, RefreshControl } from "react-native";
 import { useEffect, useState } from 'react';
-import { getClients, addClient, Client } from '../database';
-
+import { getClients, addClient, addLift, Client, resetDB } from '../database';
+import { useNavigation } from "expo-router";
 
 export default function Index() {
   const [modalVisible, setModalVisible] = useState(false);
+  const [liftModalVisible, setLiftModalVisible] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [age, setAge] = useState('');
   const [height, setHeight] = useState('');
+  const [liftName, setLiftName] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const navigation = useNavigation();
 
-  useEffect( ()=> {
-    loadClients()
-    }, []
-  );
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity onPress={() => setLiftModalVisible(true)} style={{ marginRight: 16 }}>
+          <Text style={styles.headerPlus}>+</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, []);
 
   function handleRefresh() {
     setRefreshing(true);
@@ -28,7 +40,7 @@ export default function Index() {
     try {
       const results = getClients();
       setClients(results);
-    } catch(e) {
+    } catch (e) {
       console.log(e);
     }
   }
@@ -42,60 +54,79 @@ export default function Index() {
       setAge('');
       setHeight('');
       loadClients();
-    } catch(e) {
+    } catch (e) {
+      console.log(e);
+    }
+  }
+
+  function handleAddLift() {
+    if (!liftName.trim()) return;
+    try {
+      addLift(liftName.trim());
+      setLiftName('');
+      setLiftModalVisible(false);
+    } catch (e) {
       console.log(e);
     }
   }
 
   return (
-    <View style={{ flex: 1,
-      backgroundColor: "white", }}>
+    <View style={{ flex: 1, backgroundColor: "white" }}>
       <ScrollView
-        contentContainerStyle={{
-          gap: 16,
-          padding: 16
-      }}
-      refreshControl={<RefreshControl refreshing={refreshing}
-      onRefresh={handleRefresh}
-      tintColor = "#B6E3BE" />
-      }>
-      {clients.map((client) => (
-        <Link key = {client.name}
-        href ={{ pathname: "/details", params: {name : client.name}}}
-        style = {{
-          backgroundColor: 'grey',
-          padding: 30,
-          borderRadius: 20,
-        }}>
-          <View>
-            <Text style={styles.name}>{client.name}</Text>
-          </View>
-        </Link>
-      ))}
+        contentContainerStyle={{ gap: 16, padding: 16 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#B6E3BE" />}
+      >
+        {clients.map((client) => (
+          <Link
+            key={client.name}
+            href={{ pathname: "/details", params: { name: client.name } }}
+            style={{ backgroundColor: 'grey', padding: 30, borderRadius: 20 }}
+          >
+            <View>
+              <Text style={styles.name}>{client.name}</Text>
+            </View>
+          </Link>
+        ))}
       </ScrollView>
 
       <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
         <Text style={styles.fabIcon}>+</Text>
       </TouchableOpacity>
 
+      {/* Add Client Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>New Client</Text>
-            <TextInput style={styles.input} placeholder='Name' value={name} onChangeText={setName}></TextInput>
-            <TextInput style={styles.input} placeholder='Phone' value={phone} onChangeText={setPhone} keyboardType="phone-pad"></TextInput>
-            <TextInput style={styles.input} placeholder='Age' value={age} onChangeText={setAge} keyboardType="numeric"></TextInput>
-            <TextInput style={styles.input} placeholder='Height' value={height} onChangeText={setHeight}></TextInput>
-            <Button title='Add Client' onPress={handleAddClient}></Button>
-            <Button title='Cancel' color='red' onPress={() => setModalVisible(false)}></Button>
+            <TextInput style={styles.input} placeholder='Name' value={name} onChangeText={setName} />
+            <TextInput style={styles.input} placeholder='Phone' value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+            <TextInput style={styles.input} placeholder='Age' value={age} onChangeText={setAge} keyboardType="numeric" />
+            <TextInput style={styles.input} placeholder='Height' value={height} onChangeText={setHeight} />
+            <Button title='Add Client' onPress={handleAddClient} />
+            <Button title='Cancel' color='red' onPress={() => setModalVisible(false)} />
           </View>
         </View>
       </Modal>
 
+      {/* Add Lift Modal */}
+      <Modal visible={liftModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>New Lift</Text>
+            <TextInput
+              style={styles.input}
+              placeholder='e.g. Bench Press'
+              value={liftName}
+              onChangeText={setLiftName}
+            />
+            <Button title='Add Lift' onPress={handleAddLift} />
+            <Button title='Cancel' color='red' onPress={() => setLiftModalVisible(false)} />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   name: {
@@ -103,6 +134,11 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "left",
     color: "black"
+  },
+  headerPlus: {
+    fontSize: 28,
+    color: '#007AFF',
+    fontWeight: 'bold',
   },
   fab: {
     position: 'absolute',

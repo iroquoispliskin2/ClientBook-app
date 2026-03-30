@@ -205,19 +205,19 @@ export function getSessionEntries(session_id: number): SessionLiftEntry[] {
     [session_id]
   );
 }
-  export function addSessionEntry(
-    session_id: number,
-    client_id: number,
-    lift_id: number,
-    weight: number | null,
-    reps: number | null,
-    rpe: number | null
-  ): SQLite.SQLiteRunResult {
-    return db.runSync(
-      `INSERT INTO lift_entries (session_id, client_id, weight, reps, rpe) VALUES (?, ?, ?, ?, ?, ?)`,
-      [session_id, client_id, lift_id, weight, reps, rpe]
-    );
-  }
+export function addSessionEntry(
+  session_id: number,
+  client_id: number,
+  lift_id: number,
+  weight: number | null,
+  reps: number | null,
+  rpe: number | null
+): SQLite.SQLiteRunResult {
+  return db.runSync(
+    `INSERT INTO lift_entries (session_id, client_id, lift_id, weight, reps, rpe) VALUES (?, ?, ?, ?, ?, ?)`,
+    [session_id, client_id, lift_id, weight, reps, rpe]
+  );
+}
 
   export function deleteSessionEntry(id: number): void {
     db.runSync(`DELETE FROM lift_entries WHERE id = ?`, [id]);
