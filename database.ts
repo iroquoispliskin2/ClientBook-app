@@ -51,6 +51,28 @@ export interface LiftEntry {
   sets: number | null;
   recorded_at: string;
   lift_name: string;
+  rpe:  number | null;
+}
+
+export interface SessionLiftEntry {
+  id: number,
+  session_id: number,
+  client_id: number,
+  lift_id: number,
+  lift_name: string,
+  weight: number | null;
+  reps: number | null;
+  rpe: number | null;
+}
+
+export interface LiftHistoryEntry {
+  lift_id: number;
+  id: number,
+  lift_name: string;
+  recorded_at: string;
+  weight: number | null;
+  reps: number | null;
+  rpe: number | null;
 }
 
 export function resetDB(): void {
@@ -109,6 +131,7 @@ export function initDB(): void {
       lift_id INTEGER,
       session_id INTEGER,
       weight REAL,
+      rpe REAL,
       reps INTEGER,
       sets INTEGER,
       recorded_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -172,6 +195,34 @@ export function addWorkoutSession(client_id: number, notes: string, date?: strin
   );
 }
 
+export function getSessionEntries(session_id: number): SessionLiftEntry[] {
+  return db.getAllSync<SessionLiftEntry>(
+    `SELECT lift_entries.*, lifts.name as lift_name
+    FROM lift_entries
+    JOIN lifts ON lift_entries.lift_id = lifts.id
+    WHERE lift_entries.session_id=?
+    ORDER BY lifts.name, lift_entries.id`,
+    [session_id]
+  );
+}
+  export function addSessionEntry(
+    session_id: number,
+    client_id: number,
+    lift_id: number,
+    weight: number | null,
+    reps: number | null,
+    rpe: number | null
+  ): SQLite.SQLiteRunResult {
+    return db.runSync(
+      `INSERT INTO lift_entries (session_id, client_id, weight, reps, rpe) VALUES (?, ?, ?, ?, ?, ?)`,
+      [session_id, client_id, lift_id, weight, reps, rpe]
+    );
+  }
+
+  export function deleteSessionEntry(id: number): void {
+    db.runSync(`DELETE FROM lift_entries WHERE id = ?`, [id]);
+  }
+
 
 // ─── BASELINE STATS ────────────────────────────────────
 
@@ -231,4 +282,26 @@ export function getLiftEntries(client_id: number): LiftEntry[] {
 
 export function deleteLiftEntry(id: number): void {
   db.runSync(`DELETE FROM lift_entries WHERE id = ?`, [id]);
+}
+
+export function getClientLifts(client_id: number): {lift_id: number; lift_name: string } [] {
+  return db.getAllSync(
+    `SELECT DISTINCT lift_entries.lift_id, lifts.name as lift_name
+    FROM lift_entries
+    JOIN lifts ON lift_entries.lift_id = lifts.id
+    WHERE lift_entries.client_id = ?
+    ORDER BY lifts.name ASC`,
+    [client_id]
+  );
+}
+
+export function getLiftHistory(client_id: number, lift_id: number): LiftHistoryEntry[] {
+  return db.getAllSync<LiftHistoryEntry>(
+    `SELECT lift_entries.*, lifts.name as lift_name
+     FROM lift_entries
+     JOIN lifts ON lift_entries.lift_id = lifts.id
+     WHERE lift_entries.client_id = ? AND lift_entries.lift_id = ?
+     ORDER BY lift_entries.recorded_at DESC`,
+    [client_id, lift_id]
+  );
 }
