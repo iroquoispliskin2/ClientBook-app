@@ -1,7 +1,10 @@
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, Button, Alert } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, TextInput, Button, Alert, Dimensions } from "react-native";
+import { LineChart } from "react-native-chart-kit";
 import { getClients, getBaselineStats, addBaselineStat, deleteBaselineStat, Client, BaselineStat } from '../database';
+
+const screenWidth = Dimensions.get("window").width;
 
 export default function StatHist() {
   const { name } = useLocalSearchParams();
@@ -9,6 +12,7 @@ export default function StatHist() {
   const [stats, setStats] = useState<BaselineStat[]>([]);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [modalVisible, setModalVisible] = useState(false);
+  const [activeMetric, setActiveMetric] = useState<'weight' | 'muscle' | 'body_fat'>('weight');
 
   const [date, setDate] = useState('');
   const [weight, setWeight] = useState('');
@@ -41,10 +45,7 @@ export default function StatHist() {
       console.log('insert failed:', e);
     }
     setModalVisible(false);
-    setDate('');
-    setWeight('');
-    setMuscle('');
-    setBodyFat('');
+    setDate(''); setWeight(''); setMuscle(''); setBodyFat('');
   }
 
   function handleDelete(id: number) {
@@ -64,11 +65,77 @@ export default function StatHist() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   }
 
+  function formatShortDate(dateStr: string) {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  }
+
+  // Build chart data from stats that have the selected metric
+  const chartStats = stats.filter(s => s[activeMetric] != null);
+
+  const chartData = chartStats.length >= 2 ? {
+    labels: chartStats.map(s => formatShortDate(s.recorded_at)),
+    datasets: [{
+      data: chartStats.map(s => Number(s[activeMetric])),
+      color: () => '#007AFF',
+      strokeWidth: 2,
+    }],
+  } : null;
+
+  const metricLabel = { weight: 'Weight (lbs)', muscle: 'Muscle (lbs)', body_fat: 'Body Fat (%)' }[activeMetric];
+
   if (!client) return <Text>Client not found.</Text>;
 
   return (
     <View style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={{ gap: 12, padding: 16 }}>
+
+        {/* Chart Section */}
+        <View style={styles.chartCard}>
+          <Text style={styles.chartTitle}>Trend Over Time</Text>
+
+          {/* Metric Toggle */}
+          <View style={styles.toggleRow}>
+            {(['weight', 'muscle', 'body_fat'] as const).map(metric => (
+              <TouchableOpacity
+                key={metric}
+                style={[styles.toggleBtn, activeMetric === metric && styles.toggleBtnActive]}
+                onPress={() => setActiveMetric(metric)}
+              >
+                <Text style={[styles.toggleText, activeMetric === metric && styles.toggleTextActive]}>
+                  {metric === 'weight' ? 'Weight' : metric === 'muscle' ? 'Muscle' : 'Body Fat'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {chartData ? (
+            <LineChart
+              data={chartData}
+              width={screenWidth - 48}
+              height={200}
+              chartConfig={{
+                backgroundColor: '#1a1a1a',
+                backgroundGradientFrom: '#1a1a1a',
+                backgroundGradientTo: '#2a2a2a',
+                decimalPlaces: 1,
+                color: () => '#007AFF',
+                labelColor: () => '#aaa',
+                propsForDots: { r: '4', strokeWidth: '2', stroke: '#007AFF' },
+              }}
+              bezier
+              style={{ borderRadius: 12, marginTop: 8 }}
+            />
+          ) : (
+            <Text style={styles.chartEmpty}>
+              {chartStats.length === 0
+                ? `No ${metricLabel} data yet.`
+                : 'Need at least 2 entries to show a trend.'}
+            </Text>
+          )}
+        </View>
+
+        {/* Stat Entries */}
         {stats.length === 0 && (
           <Text style={styles.empty}>No stats logged yet.</Text>
         )}
@@ -125,6 +192,46 @@ export default function StatHist() {
 }
 
 const styles = StyleSheet.create({
+  chartCard: {
+    backgroundColor: '#1a1a1a',
+    borderRadius: 16,
+    padding: 16,
+  },
+  chartTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#2a2a2a',
+    alignItems: 'center',
+  },
+  toggleBtnActive: {
+    backgroundColor: '#007AFF',
+  },
+  toggleText: {
+    color: '#aaa',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  toggleTextActive: {
+    color: 'white',
+  },
+  chartEmpty: {
+    color: '#aaa',
+    textAlign: 'center',
+    marginTop: 30,
+    marginBottom: 10,
+    fontSize: 14,
+  },
   statBlock: {
     backgroundColor: '#2a2a2a',
     borderRadius: 16,
