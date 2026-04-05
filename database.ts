@@ -121,7 +121,7 @@ export function initDB(): void {
     db.execSync(`
     CREATE TABLE IF NOT EXISTS lifts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL
+      name TEXT NOT NULL UNIQUE
       );
     `);
     db.execSync(`
@@ -152,7 +152,7 @@ export function addClient(name: string, phone: string, age: number, height: stri
 }
 
 export function getClients(): Client[] {
-  return db.getAllSync<Client>(`SELECT * FROM clients`);
+  return db.getAllSync<Client>(`SELECT * FROM clients ORDER BY name ASC`);
 }
 
 // export function deleteClient(id: number): void {
@@ -260,7 +260,7 @@ export function deleteBaselineStat(id: number): void {
 
 export function addLift(name: string): SQLite.SQLiteRunResult {
   return db.runSync(
-    `INSERT INTO lifts (name) VALUES (?)`,
+    `INSERT OR IGNORE INTO lifts (name) VALUES (?)`,
     [name]
   );
 }
